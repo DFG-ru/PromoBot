@@ -21,6 +21,9 @@ __pycache__/
 *.csv
 *.xlsx
 
+# Исключаем из игнорирования папку requirements
+!requirements/
+
 # Дальше исключения из ".gitignore template: python" из GitHub
 
 # Byte-compiled / optimized / DLL files
