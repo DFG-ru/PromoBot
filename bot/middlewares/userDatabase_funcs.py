@@ -28,7 +28,7 @@ def update(phone_number, new_data):
         for i, row in enumerate(rows[1:], start=1):
             if row[4] == phone_number:
                 rows[i] = [
-                    row[0],
+                    new_data.get('user_id', row[0]),
                     new_data.get('first_name', row[1]),
                     new_data.get('last_name', row[2]),
                     new_data.get('username', row[3]),
@@ -53,6 +53,10 @@ def phone_exist(phone_number):
             if row[4] == phone_number:
                 return True
     return False
+    
+def coupon_exist(phone_number):
+    coupon_code = get_user_coupon(phone_number)
+    return coupon_code != 'None'
     
 def get_user_coupon(phone_number):
     if not os.path.isfile(user_db_path):

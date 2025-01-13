@@ -30,6 +30,7 @@ def drawNumber(img, s, xy=(0,0), size=58):
 
 def couponGen(template: str, code: str):
     path_to_substrate = get_substrate_path(template)
+    
     coupon = code
     qr = gen_qr_code(coupon)
     qr_xy = (52, 651)
