@@ -143,5 +143,3 @@ def gen_qr_code(text: str):
     idraw.rectangle((length_qr - coeff * 10, length_qr - coeff * 6, length_qr - coeff * 6, length_qr - coeff * 5),
                     fill=black_2)
     return output_qr
-    
-    
