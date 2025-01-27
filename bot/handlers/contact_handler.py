@@ -7,14 +7,15 @@ from middlewares import couponCodes_funcs as couponDB
 from middlewares import userDatabase_funcs as userDB
 import logging
 
-TEMPLATE = 'zhizn_substrate.jpg'
-COUPON_MASK = '9002024'
-SOCIAL_MEDIA_URL = 'https://vk.com/zhizn_rest'
-WEBSITE_URL = 'https://zhiznudalas.ru/'
+TEMPLATE = 'pro9_substrate.jpg'
+COUPON_MASK = '9082024'
+SOCIAL_MEDIA_URL = 'You social media url'
+WEBSITE_URL = 'Your website url'
 
-async def contact_handler_zhizn(message: Message):
+
+async def contact_handler(message: Message):
     """
-    Обработчик контактов для бренда Жизнь Удалась.
+    Обработчик контактов для бренда <бренд>.
     Обновляет данные пользователя или добавляет нового пользователя и проверяет наличие купона.
     """
     contact: Contact = message.contact
