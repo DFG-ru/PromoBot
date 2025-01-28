@@ -16,10 +16,14 @@ __pycache__/
 
 # Исключаем конфигурационные файлы
 *.cfg
+*.json
 
 # Игнорируем базу данных в .\bot\data
 *.csv
 *.xlsx
+
+# Исключаем из игнорирования папку requirements
+!requirements/
 
 # Дальше исключения из ".gitignore template: python" из GitHub
 

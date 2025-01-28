@@ -9,9 +9,9 @@
 :: 
 
 
-:: Узнаем SERVICE_NAME будущей службы из service-config.txt
+:: Узнаем SERVICE_NAME будущей службы из service-config.cfg
 :: Если файла service-config.txt нет, то создайте его и добавьте строку SERVICE_NAME=<имя сервиса>
-for /f "tokens=1* delims==" %%a in ('findstr /b "SERVICE_NAME=" service-config.cfg') do (
+for /f "tokens=1* delims==" %%a in ('findstr /b "SERVICE_NAME=" %~dp0\service-config.cfg') do (
     set "SERVICE_NAME=%%b"
 )
 

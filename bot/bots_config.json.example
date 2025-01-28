@@ -1,0 +1,18 @@
+{
+    "bots": [
+        {
+            "token": "token_1",
+            "template": "substrate_1.jpg",
+            "coupon_mask": "0000000",
+            "social_media_url": "https://t.me/channel1",
+            "website_url": "https://site-1.ru/"
+        },
+        {
+            "token": "token_2",
+            "template": "substrate_2.jpg",
+            "coupon_mask": "1111111",
+            "social_media_url": "https://t.me/channel2",
+            "website_url": "https://site-2.ru/"
+        }
+    ]
+}
