@@ -1,11 +1,12 @@
 import asyncio
 import os
+from datetime import datetime
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message, Contact, FSInputFile, ReplyKeyboardRemove
 from middlewares import couponGen
 from middlewares import couponCodes_funcs as couponDB
 from middlewares import userDatabase_funcs as userDB
-from routers import router
+from routers import setup_router
 import logging
 
 class BotInstance:
@@ -16,10 +17,17 @@ class BotInstance:
         self.social_media_url = social_media_url
         self.website_url = website_url
         self.dp = Dispatcher()
-        self.setup_routers()
+        self.init_done = False
 
-    async def setup_routers(self):
-        self.dp.include_router(router)
+    async def setup_router(self):
+        if not self.init_done:
+            setup_router(self.dp)
+            self.dp.update.outer_middleware(self.middleware)
+            self.init_done = True
+
+    async def middleware(self, handler, event, data):
+        data['bot_instance'] = self
+        return await handler(event, data)
 
     async def run(self):
         bot = Bot(self.token)
@@ -27,7 +35,7 @@ class BotInstance:
         logging.info(f"Инициализация бота \"{botInfo.first_name}\", ID: {botInfo.id}")
         print(f'{str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))} - Бот {botInfo.first_name} запущен')
 
-        self.dp.update.outer_middleware(self.middleware)
+        await self.setup_router()
 
         await bot.delete_webhook(drop_pending_updates=True)
         try:
@@ -35,7 +43,3 @@ class BotInstance:
             await self.dp.start_polling(bot)
         finally:
             await bot.session.close()
-
-    async def middleware(self, handler, event, data):
-        data['bot_instance'] = self
-        return await handler(event, data)

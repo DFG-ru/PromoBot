@@ -1,9 +1,12 @@
+from aiogram import Router, F
 from aiogram import Dispatcher
-from .router_pro9 import router as router_pro9
-from .router_zhizn import router as router_zhizn
+from aiogram.filters import CommandStart
+from handlers import start_handler, contact_handler, unknown_message_handler
 
-def setup_routers(token, dp: Dispatcher):
-    if token == 'TOKEN_PRO9':
-        dp.include_router(router_pro9)
-    if token == 'TOKEN_ZHIZN':
-        dp.include_router(router_zhizn)
+
+def setup_router(dp: Dispatcher):
+    router = Router(name="main_router")
+    router.message.register(start_handler, CommandStart())
+    router.message.register(contact_handler, F.contact)
+    router.message.register(unknown_message_handler)
+    dp.include_router(router)

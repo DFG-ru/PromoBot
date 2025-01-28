@@ -1,4 +1,3 @@
-import csv
 import os
 from aiogram import F, types
 from aiogram.types import Message, Contact, FSInputFile, ReplyKeyboardRemove
@@ -7,15 +6,9 @@ from middlewares import couponCodes_funcs as couponDB
 from middlewares import userDatabase_funcs as userDB
 import logging
 
-TEMPLATE = 'pro9_substrate.jpg'
-COUPON_MASK = '9082024'
-SOCIAL_MEDIA_URL = 'You social media url'
-WEBSITE_URL = 'Your website url'
-
-
-async def contact_handler(message: Message):
+async def contact_handler(message: Message, bot_instance):
     """
-    Обработчик контактов для бренда <бренд>.
+    Обработчик контактов.
     Обновляет данные пользователя или добавляет нового пользователя и проверяет наличие купона.
     """
     contact: Contact = message.contact
@@ -46,9 +39,8 @@ async def contact_handler(message: Message):
         logging.info(f"User did not receive coupon. The promotion has ended. | fullname={full_name}, username=@{username}, id={user_id}")
         await message.answer(
             "Выдача купонов завершена.\n"
-            "Следите за новыми предложениями в наших соц. сетях и на сайте:\n"
-            f"Вконтакте: {SOCIAL_MEDIA_URL}\n"
-            f"Наш сайт: {WEBSITE_URL}\n",
+            f"Следите за новыми предложениями в нашей соц. сети: {bot_instance.social_media_url}\n"
+            f"Следите за новыми предложениями на нашем сайте: {bot_instance.website_url}",
             reply_markup=types.ReplyKeyboardRemove()
         )
         return
@@ -60,7 +52,7 @@ async def contact_handler(message: Message):
     # Генерация QR-кода, если файл не существует
     if not os.path.exists(qr_file_name):
         logging.info(f"Generating QR code for coupon: {coupon_code}")
-        couponGen(TEMPLATE, coupon_code)
+        couponGen(bot_instance.template, coupon_code)
 
     # Отправка купона пользователю
     qr_file = FSInputFile(qr_file_name)
@@ -70,9 +62,8 @@ async def contact_handler(message: Message):
         "Вы можете его использовать до конца января 2025 года.\n"
         "\n"
         "Выдача новых купонов завершена.\n"
-        "Следите за новыми предложениями в наших соц. сетях и на сайте:\n"
-        f"Вконтакте: {SOCIAL_MEDIA_URL}\n"
-        f"Наш сайт: {WEBSITE_URL}\n"
+        f"Следите за новыми предложениями в нашей соц. сети: {bot_instance.social_media_url}\n"
+        f"Следите за новыми предложениями на нашем сайте: {bot_instance.website_url}\n"
         "\n"
         "Ваш купон:",
         reply_markup=types.ReplyKeyboardRemove()
