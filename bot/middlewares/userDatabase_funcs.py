@@ -8,39 +8,68 @@ def write(user_id, first_name, last_name, username, contact=None, coupon_code=No
     file_exists = os.path.isfile(user_db_path)
     with open(user_db_path, mode='a+', newline='', encoding='utf-8') as file:
         writer = csv.writer(file, delimiter=',')
-        if not file_exists:
-            writer.writerow(
-                ['ID', 'Имя', 'Фамилия', 'Имя пользователя', 'Номер телефона', 'Купон'])
-        writer.writerow([user_id, first_name or "Не указано", last_name or "Не указано", username or "Не указано",
-                         contact or "Не указано", f"{coupon_code}" or "Не указано"])
-
+        writer.writerow([
+            user_id,
+            first_name or "Не указано",
+            last_name or "Не указано",
+            username or "Не указано",
+            contact or "Не указано",
+            coupon_code or "Не указано"
+        ])
 
 def update(phone_number, new_data):
     if not os.path.isfile(user_db_path):
-        return
-    rows = []
+            return False
+
+    # 🔑 Константы для индексов столбцов (явное управление структурой)
+    COLUMNS = {
+        'user_id': 0,
+        'first_name': 1,
+        'last_name': 2,
+        'username': 3,
+        'phone': 4,      # Номер телефона для поиска
+        'coupon_code': 5
+    }
+    MIN_COLUMNS = max(COLUMNS.values()) + 1  # Минимальное кол-во столбцов = 6
+
     updated = False
+    rows = []
+
+    # 1️⃣ Читаем все данные
     with open(user_db_path, mode='r', encoding='utf-8') as file:
         reader = csv.reader(file)
         rows = list(reader)
-    if rows:
-        header = rows[0]
-        for i, row in enumerate(rows[1:], start=1):
-            if row[4] == phone_number:
-                rows[i] = [
-                    new_data.get('user_id', row[0]),
-                    new_data.get('first_name', row[1]),
-                    new_data.get('last_name', row[2]),
-                    new_data.get('username', row[3]),
-                    row[4],
-                    row[5]
-                ]
-                updated = True
-                break
+
+    # 2️⃣ Ищем запись по номеру телефона
+    for i, row in enumerate(rows):
+        # Защита от коротких строк (меньше 5 столбцов)
+        if len(row) <= COLUMNS['phone']:
+            continue
+            
+        if row[COLUMNS['phone']] == phone_number:
+            # 3️⃣ Дополняем строку до минимальной длины, если нужно
+            if len(row) < MIN_COLUMNS:
+                row.extend([''] * (MIN_COLUMNS - len(row)))
+            
+            # 4️⃣ ТОЧЕЧНОЕ ОБНОВЛЕНИЕ: меняем ТОЛЬКО указанные поля
+            for field, value in new_data.items():
+                if field in COLUMNS:  # Проверяем, что поле существует в структуре
+                    col_idx = COLUMNS[field]
+                    # Автоматически расширяем строку, если не хватает столбцов
+                    if col_idx >= len(row):
+                        row.extend([''] * (col_idx - len(row) + 1))
+                    row[col_idx] = value
+            
+            updated = True
+            break  # Обновляем только первую найденную запись
+
+    # 5️⃣ Сохраняем изменения
     if updated:
         with open(user_db_path, mode='w', encoding='utf-8', newline='') as file:
             writer = csv.writer(file)
             writer.writerows(rows)
+    
+    return updated
 
 
 def phone_exist(phone_number):
@@ -48,11 +77,16 @@ def phone_exist(phone_number):
         return False
     with open(user_db_path, mode='r', encoding='utf-8') as file:
         reader = csv.reader(file)
-        next(reader)
+
+        # Читаем строки по одной
         for row in reader:
+            if not row:
+                continue  # пропускаем пустые строки
             if row[4] == phone_number:
                 return True
-    return False
+
+        # Номер не найден
+        return False
     
 def coupon_exist(phone_number):
     coupon_code = get_user_coupon(phone_number)
@@ -63,8 +97,10 @@ def get_user_coupon(phone_number):
         return None
     with open(user_db_path, mode='r', encoding='utf-8') as file:
         reader = csv.reader(file)
-        next(reader)
         for row in reader:
             if row[4] == phone_number:
-                return row[5]
+                if row[5] != "Не указано":
+                    return row[5]
+                else:
+                    return None
     return None

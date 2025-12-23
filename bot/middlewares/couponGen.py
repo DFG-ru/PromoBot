@@ -28,10 +28,10 @@ def drawNumber(img, s, xy=(0,0), size=58):
         getch()
 
 
-def couponGen(template: str, code: str):
+def couponGen(template: str, coupon):
+    coupon = str(coupon)
     path_to_substrate = get_substrate_path(template)
     
-    coupon = code
     qr = gen_qr_code(coupon)
     qr_xy = (52, 651)
     qr_width, qr_height = qr.size
@@ -57,7 +57,9 @@ def couponGen(template: str, code: str):
     print(f"QR {coupon} создан")
 
 
-def gen_qr_code(text: str):
+def gen_qr_code(text):
+    text = str(text)
+    
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_H,
