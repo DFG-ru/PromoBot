@@ -21,7 +21,7 @@ async def contact_handler(message: Message, bot_instance):
     logging.info(f"User logged in. | fullname={full_name}, username=@{username}, id={user_id}")
 
     # Проверка наличия номера телефона в базе данных пользователей
-    if userDB.phone_exist(contact.phone_number):
+    if userDB.phone_exist(contact.phone_number) and userDB.coupon_exist(user_id, bot_instance.coupon_mask):
         logging.info(f"Existing user found, data updated. | fullname={full_name}, username=@{username}, id={user_id}")
         new_data = {
             'user_id': user_id,
@@ -35,17 +35,13 @@ async def contact_handler(message: Message, bot_instance):
         userDB.write(user.id, user.first_name, user.last_name, user.username, contact.phone_number)
 
     # Получение купона для пользователя
-    coupon_code = userDB.get_user_coupon(contact.phone_number)
+    coupon_code = userDB.get_user_coupon(contact.phone_number, bot_instance.coupon_mask)
     if coupon_code == None:
         coupon_code = couponDB.get_random_coupon_code(bot_instance.coupon_mask)
         new_data = {
-            'user_id': user_id,
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'username': user.username,
             'coupon_code': coupon_code
         }
-        userDB.update(contact.phone_number, new_data)
+        userDB.update_coupon(contact.phone_number, new_data)
         logging.info(f"User received a new coupon. | fullname={full_name}, username=@{username}, id={user_id}, coupon=\"{coupon_code}\"")
     
     qr_file_name = f"middlewares/output/{coupon_code[-6:]}.jpg"
@@ -59,12 +55,20 @@ async def contact_handler(message: Message, bot_instance):
     qr_file = FSInputFile(qr_file_name)
     logging.info(f"User received coupon. | fullname={full_name}, username=@{username}, id={user_id}, coupon=\"{coupon_code}\"")
     await message.answer(
-        "Вы можете использовать купон до конца января 2026 года.\n"
-        "\n"
-        f"Следите за новыми предложениями в нашей соц. сети: {bot_instance.social_media_url}\n"
-        f"Следите за новыми предложениями на нашем сайте: {bot_instance.website_url}\n"
-        "\n"
         "Ваш купон:",
         reply_markup=types.ReplyKeyboardRemove()
     )
     await message.answer_photo(photo=qr_file, reply_markup=ReplyKeyboardRemove())
+    await message.answer(
+        "🎉Вы можете использовать купон до конца января 2026 года.\n"
+        "\n"
+        f"Следите за новыми предложениями в наших соц сетях:\n"
+        f"\n"
+        f"💎Телеграмм: https://t.me/samaragastro\n"
+        f"\n"
+        f"💎Вконтакте: {bot_instance.social_media_url}\n"
+        f"\n"
+        f"\n"
+        f"🌐А также на нашем сайте: {bot_instance.website_url}\n",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
