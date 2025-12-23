@@ -1,3 +1,51 @@
+# Запрещаем всё
+*
+
+# Разрешаем файлы
+!.gitignore
+!LICENSE
+!README.md
+!service-config.cfg.example
+!service-menu.bat
+
+# Разрешаем папки
+!bot/
+!bot/log/
+!bot/data/
+!bot/handlers/
+!bot/middlewares/
+!bot/middlewares/output/
+!bot/middlewares/templates/
+!bot/routers/
+!requirements/
+
+# Разрешаем файлы внутри папок
+!bot/bot_instance.py
+!bot/bots_config.json.example
+!bot/main.py
+!bot/log/.gitkeep
+!bot/data/CouponCodes.txt.example
+!bot/handlers/__init__.py
+!bot/handlers/contact_handler.py
+!bot/handlers/keyboards.py
+!bot/handlers/start_handler.py
+!bot/handlers/unknown_message_handler.py
+!bot/middlewares/output/.gitkeep
+!bot/middlewares/__init__.py
+!bot/middlewares/couponCodes_funcs.py
+!bot/middlewares/couponGen.py
+!bot/middlewares/userDatabase_funcs.py
+!bot/middlewares/templates/.gitkeep
+!bot/routers/__init__.py
+!requirements/Install_requirements.bat
+!requirements/Shentox-Regular (RUS by Slavchansky)_0.ttf
+
+### Все что ниже игнорируется по умолчанию
+
+# Исключить конкретные файлы из игнорирования
+!bot/data/
+!logs/config.json
+
 # Исключаем виртуальные окружения
 venv/
 
