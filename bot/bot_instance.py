@@ -10,7 +10,8 @@ from routers import setup_router
 import logging
 
 class BotInstance:
-    def __init__(self, token: str, template: str, coupon_mask: str, social_media_url: str, website_url: str):
+    def __init__(self, botname: str, token: str, template: str, coupon_mask: str, social_media_url: str, website_url: str):
+        self.botname = botname
         self.token = token
         self.template = template
         self.coupon_mask = coupon_mask

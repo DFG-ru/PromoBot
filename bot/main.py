@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import logging
+from aiogram import Bot
 from datetime import datetime
 import json
 from bot_instance import BotInstance
@@ -24,7 +25,10 @@ async def main():
 
     if 'bots' in config:
         for bot_config in config['bots']:
+            bot = Bot(bot_config.get('token'))
+            botInfo = await bot.get_me()
             bot_instance = BotInstance(
+                botname=botInfo.first_name,
                 token=bot_config.get('token'),
                 template=bot_config.get('template'),
                 coupon_mask=bot_config.get('coupon_mask'),
