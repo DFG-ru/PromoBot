@@ -4,6 +4,7 @@ from aiogram.types import Message, Contact, FSInputFile, ReplyKeyboardRemove
 from middlewares import couponGen
 from middlewares import couponCodes_funcs as couponDB
 from middlewares import userDatabase_funcs as userDB
+from middlewares.couponGen import OUTPUT_DIR
 import logging
 import datetime
 
@@ -59,15 +60,21 @@ async def contact_handler(message: Message, bot_instance):
         )
         return
     
-    qr_file_name = f"middlewares/output/{coupon_code[-6:]}.jpg"
+    qr_file_name = OUTPUT_DIR / f"{coupon_code[-6:]}.jpg"
 
     # Генерация QR-кода, если файл не существует
     if not os.path.exists(qr_file_name):
         logging.info(f"Generating QR code for coupon: {coupon_code}")
-        couponGen(bot_instance.template, str(coupon_code))
-    
+        if not await couponGen(bot_instance.template, str(coupon_code)):
+            logging.error(f"Не удалось сгенерировать купон: {coupon_code}")
+            await message.answer(
+                "Не удалось сформировать ваш купон. Попробуйте позже.",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+            return
+
     # Отправка купона пользователю
-    qr_file = FSInputFile(qr_file_name)
+    qr_file = FSInputFile(str(qr_file_name))
     logging.info(f"User received coupon. | fullname={full_name}, username=@{username}, id={user_id}, coupon=\"{coupon_code}\"")
     await message.answer(
         "Ваш купон:",

@@ -1,10 +1,10 @@
+import io
+import logging
+
+import aiofiles
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
-from pyzbar.pyzbar import decode
 from pathlib import Path
-from msvcrt import getch
-from random import randint
-from os import mkdir, path, getcwd
 
 
 BASE_DIR = Path(__file__).resolve().parent  # Директория middlewares
@@ -16,55 +16,69 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def saveImage(img: Image, s: str):
+async def saveImage(img: Image, s: str):
+    """Асинхронно сохраняет изображение купона в OUTPUT_DIR.
+
+    PIL не умеет писать напрямую в асинхронный файловый объект,
+    поэтому кодируем изображение в байтовый буфер и выгружаем его через aiofiles.
+    """
     output_path = OUTPUT_DIR / f"{s}.jpg"
-    img.convert('RGB').save(output_path)
-    
+    buffer = io.BytesIO()
+    img.convert('RGB').save(buffer, format='JPEG')
+    async with aiofiles.open(output_path, 'wb') as f:
+        await f.write(buffer.getvalue())
+    return output_path
+
 
 def get_substrate_path(template: str):
     return TEMPLATES_DIR / template
     
 
 def drawNumber(img, s, xy=(0,0), size=58):
-    f = 'Shentox-Regular (RUS by Slavchansky).ttf'
-    # font = 'segoeuib.ttf'
+    """Наносит номер купона на изображение.
+
+    Используется шрифт из системного каталога шрифтов; если шрифт или
+    файл купона отсутствуют — фиксируется ошибка в лог и возврат без падения бота.
+    """
+    font_path = BASE_DIR / 'fonts' / 'Shentox-Regular (RUS by Slavchansky).ttf'
     idraw = ImageDraw.Draw(img, "RGBA")
     try:
-        font = ImageFont.truetype(f, size)
-        idraw.text(xy, s, (255,255,255,88), anchor="mt", font=font)
-    except:
-        print("Ошибка:")
-        print("Нужно установить шрифт:\n" + f + "\n")
-        getch()
+        font = ImageFont.truetype(str(font_path), size)
+        idraw.text(xy, s, (255, 255, 255, 88), anchor="mt", font=font)
+    except OSError:
+        logging.error(f"Не найден шрифт {font_path}, номер купона не нанесён")
 
 
-def couponGen(template: str, coupon):
+async def couponGen(template: str, coupon):
     coupon = str(coupon)
     path_to_substrate = get_substrate_path(template)
-    
+
     qr = gen_qr_code(coupon)
     qr_xy = (52, 651)
     qr_width, qr_height = qr.size
     fontcords = (qr_xy[0] + qr_width / 2, qr_xy[1] + qr_width + 3)
-    
+
     try:
         substrate = Image.open(path_to_substrate).convert("RGBA")
+    except FileNotFoundError:
+        logging.error(f"Шаблон купона не найден: {path_to_substrate}")
+        return False
+
+    try:
         output_img = substrate.copy()
 
         alpha = Image.new('RGBA', (qr_width, qr_width), (255, 255, 255, int(255 * 0.40)))
         output_img.paste(alpha, qr_xy, alpha)
 
         output_img.paste(qr, qr_xy, qr)
+    finally:
         substrate.close()
-    except FileNotFoundError as err:
-        print(f"Файл не найден")
-        print(path_to_substrate)
-        return False
-    
+
     drawNumber(output_img, coupon[7:], fontcords, 40)
-    saveImage(output_img, coupon[7:])
-    
-    print(f"QR {coupon} создан")
+    await saveImage(output_img, coupon[7:])
+
+    logging.info(f"QR {coupon} создан")
+    return True
 
 
 def gen_qr_code(text):

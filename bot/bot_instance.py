@@ -2,10 +2,6 @@ import asyncio
 import os
 from datetime import datetime
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message, Contact, FSInputFile, ReplyKeyboardRemove
-from middlewares import couponGen
-from middlewares import couponCodes_funcs as couponDB
-from middlewares import userDatabase_funcs as userDB
 from routers import setup_router
 import logging
 
