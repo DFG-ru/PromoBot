@@ -22,7 +22,7 @@ async def contact_handler(message: Message, bot_instance):
     logging.info(f"User logged in. | fullname={full_name}, username=@{username}, id={user_id}")
 
     # Проверка наличия номера телефона в базе данных пользователей
-    if await userDB.phone_exist(contact.phone_number) and await userDB.coupon_exist(user_id, bot_instance.coupon_mask):
+    if userDB.phone_exist(contact.phone_number) and userDB.coupon_exist(user_id, bot_instance.coupon_mask):
         logging.info(f"Existing user found, data updated. | fullname={full_name}, username=@{username}, id={user_id}")
         new_data = {
             'user_id': user_id,
@@ -30,22 +30,22 @@ async def contact_handler(message: Message, bot_instance):
             'last_name': user.last_name,
             'username': user.username
         }
-        await userDB.update(contact.phone_number, new_data)
+        userDB.update(contact.phone_number, new_data)
     else:
         logging.info(f"New user authorized. | fullname={full_name}, username=@{username}, id={user_id}")
-        await userDB.write(user.id, user.first_name, user.last_name, user.username, contact.phone_number)
+        userDB.write(user.id, user.first_name, user.last_name, user.username, contact.phone_number)
 
     # Получение купона для пользователя
-    coupon_code = await userDB.get_user_coupon(contact.phone_number, bot_instance.coupon_mask)
+    coupon_code = userDB.get_user_coupon(contact.phone_number, bot_instance.coupon_mask)
     
     
     
     if coupon_code == None and datetime.date.today() < datetime.date(2026, 1, 1):
-        coupon_code = await couponDB.get_random_coupon_code(bot_instance.coupon_mask)
+        coupon_code = couponDB.get_random_coupon_code(bot_instance.coupon_mask)
         new_data = {
             'coupon_code': coupon_code
         }
-        await userDB.update_coupon(contact.phone_number, new_data)
+        userDB.update_coupon(contact.phone_number, new_data)
         logging.info(f"User received a new coupon. | fullname={full_name}, username=@{username}, id={user_id}, coupon=\"{coupon_code}\"")
     elif coupon_code == None and datetime.date.today() > datetime.date(2026, 1, 1):
         await message.answer(
