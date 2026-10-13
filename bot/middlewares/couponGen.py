@@ -1,19 +1,29 @@
 import qrcode
 from PIL import Image, ImageDraw, ImageFont
 from pyzbar.pyzbar import decode
-from path import Path
+from pathlib import Path
 from msvcrt import getch
 from random import randint
 from os import mkdir, path, getcwd
 
 
-def saveImage(img: Image, s: str):
-    img.convert('RGB').save(Path().joinpath("middlewares\\output", s + ".jpg"))
+BASE_DIR = Path(__file__).resolve().parent  # Директория middlewares
+OUTPUT_DIR = BASE_DIR / 'output'
+TEMPLATES_DIR = BASE_DIR / 'templates'
 
+# Гарантируем существование директорий
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def saveImage(img: Image, s: str):
+    output_path = OUTPUT_DIR / f"{s}.jpg"
+    img.convert('RGB').save(output_path)
+    
 
 def get_substrate_path(template: str):
-    return Path().joinpath("middlewares\\templates", template)
-
+    return TEMPLATES_DIR / template
+    
 
 def drawNumber(img, s, xy=(0,0), size=58):
     f = 'Shentox-Regular (RUS by Slavchansky).ttf'

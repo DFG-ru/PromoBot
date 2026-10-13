@@ -1,4 +1,5 @@
-from path import Path
+from pathlib import Path
+import os
 from aiogram import types
 from aiogram.types import Message
 from .keyboards import phone_button
@@ -8,8 +9,7 @@ import logging
 
 # Константа для приветственного сообщения
 WELCOME_MESSAGE = (
-    "Здравствуйте, поделитесь вашим номером по кнопке ниже, "
-    "чтобы получить купон!"
+    "Здравствуйте! Чтобы получить купон, поделитесь номером телефона с помощью кнопки ниже⬇️⬇️⬇️"
 )
 
 async def start_handler(message: Message, bot_instance):
@@ -30,8 +30,11 @@ async def start_handler(message: Message, bot_instance):
     # logging.info(f"New user authorized. | fullname={full_name}, username=@{username}, id={user_id}")
     # userDB.write(user.id, user.first_name, user.last_name, user.username, contact.phone_number)
     # Отправка приветственного сообщения с кнопкой, чтобы поделиться номером телефона
-    visit_history_path = Path().joinpath('data', 'VisitHistory.txt')
-    with open(visit_history_path, 'a+') as used_codes:
+    visit_history_path = Path('data') / 'VisitHistory.txt'
+    visit_history_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(visit_history_path, 'a+', encoding='utf-8') as used_codes:
+
             used_codes.write(f"{last_active};{user_id};{username};{full_name};{bot_instance.botname}\n")  # добавляем код с новой строкой
     
     await message.answer(

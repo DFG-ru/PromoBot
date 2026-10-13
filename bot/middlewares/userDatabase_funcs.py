@@ -1,8 +1,13 @@
-from path import Path
+from pathlib import Path
 import csv
 import os
 
-user_db_path = Path().joinpath('data', 'UserDatabase.csv')
+
+BASE_DIR = Path(__file__).resolve().parent.parent  # Переходим из middlewares в корень bot
+DATA_DIR = BASE_DIR / 'data'
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+user_db_path = DATA_DIR / 'UserDatabase.csv'
 
 def write(user_id, first_name, last_name, username, phone_number=None, coupon_code=None):
     file_exists = os.path.isfile(user_db_path)
@@ -19,7 +24,7 @@ def write(user_id, first_name, last_name, username, phone_number=None, coupon_co
 
 
 def update(phone_number, new_data):
-    if not os.path.isfile(user_db_path):
+    if not user_db_path.is_file():
             return False
 
     # 🔑 Константы для индексов столбцов (явное управление структурой)
@@ -74,7 +79,7 @@ def update(phone_number, new_data):
     
     
 def update_coupon(phone_number, new_data):
-    if not os.path.isfile(user_db_path):
+    if not user_db_path.is_file():
             return False
 
     # 🔑 Константы для индексов столбцов (явное управление структурой)
@@ -132,7 +137,7 @@ def update_coupon(phone_number, new_data):
 
 
 def phone_exist(phone_number):
-    if not os.path.isfile(user_db_path):
+    if not user_db_path.is_file():
         return False
     with open(user_db_path, mode='r', encoding='utf-8') as file:
         reader = csv.reader(file)
@@ -148,7 +153,7 @@ def phone_exist(phone_number):
 
 def coupon_exist(user_id, coupon_mask):
     user_id = str(user_id)
-    if not os.path.isfile(user_db_path):
+    if not user_db_path.is_file():
         return False
     with open(user_db_path, mode='r', encoding='utf-8') as file:
         reader = csv.reader(file)
@@ -164,7 +169,7 @@ def coupon_exist(user_id, coupon_mask):
 
 
 def get_user_coupon(phone_number, coupon_mask):
-    if not os.path.isfile(user_db_path):
+    if not user_db_path.is_file():
         return None
     with open(user_db_path, mode='r', encoding='utf-8') as file:
         reader = csv.reader(file)

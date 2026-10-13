@@ -1,13 +1,17 @@
-from path import Path
+from pathlib import Path
 import os
 import random
 
-coupon_db_path = Path().joinpath('data', 'CouponCodes.txt')
-used_coupon_db_path = Path().joinpath('data', 'UsedCouponCodes.txt')
+BASE_DIR = Path(__file__).resolve().parent.parent  # Переходим из middlewares в корень bot
+DATA_DIR = BASE_DIR / 'data'
+DATA_DIR.mkdir(parents=True, exist_ok=True) # Гарантируем существование папки data
+
+coupon_db_path = DATA_DIR / 'CouponCodes.txt'
+used_coupon_db_path = DATA_DIR / 'UsedCouponCodes.txt'
 
 def read(mask: str):
     coupon_codes = []
-    if os.path.isfile(coupon_db_path):
+    if coupon_db_path.is_file():
         with open(coupon_db_path, mode='r', encoding='utf-8') as file:
             coupon_codes = [line.splitlines() for line in file if mask in line]
     return coupon_codes[0]
