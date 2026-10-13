@@ -5,6 +5,7 @@ from middlewares import couponGen
 from middlewares import couponCodes_funcs as couponDB
 from middlewares import userDatabase_funcs as userDB
 import logging
+import datetime
 
 async def contact_handler(message: Message, bot_instance):
     """
@@ -36,13 +37,27 @@ async def contact_handler(message: Message, bot_instance):
 
     # Получение купона для пользователя
     coupon_code = userDB.get_user_coupon(contact.phone_number, bot_instance.coupon_mask)
-    if coupon_code == None:
+    
+    
+    
+    if coupon_code == None and datetime.date.today() < datetime.date(2026, 1, 1):
         coupon_code = couponDB.get_random_coupon_code(bot_instance.coupon_mask)
         new_data = {
             'coupon_code': coupon_code
         }
         userDB.update_coupon(contact.phone_number, new_data)
         logging.info(f"User received a new coupon. | fullname={full_name}, username=@{username}, id={user_id}, coupon=\"{coupon_code}\"")
+    elif coupon_code == None and datetime.date.today() > datetime.date(2026, 1, 1):
+        await message.answer(
+        "Выдача купонов завершена.\n"
+        "\n"
+        f"Следите за новыми предложениями в нашем телеграмм канале:\n"
+        f"\n"
+        f"https://t.me/samaragastro\n"
+        f"💎💎💎\n",
+        reply_markup=types.ReplyKeyboardRemove()
+        )
+        return
     
     qr_file_name = f"middlewares/output/{coupon_code[-6:]}.jpg"
 
@@ -62,13 +77,9 @@ async def contact_handler(message: Message, bot_instance):
     await message.answer(
         "🎉Вы можете использовать купон до конца января 2026 года.\n"
         "\n"
-        f"Следите за новыми предложениями в наших соц сетях:\n"
+        f"Следите за новыми предложениями в нашем телеграмм канале:\n"
         f"\n"
-        f"💎Телеграмм: https://t.me/samaragastro\n"
-        f"\n"
-        f"💎Вконтакте: {bot_instance.social_media_url}\n"
-        f"\n"
-        f"\n"
-        f"🌐А также на нашем сайте: {bot_instance.website_url}\n",
+        f"https://t.me/samaragastro\n"
+        f"💎💎💎\n",
         reply_markup=types.ReplyKeyboardRemove()
     )
