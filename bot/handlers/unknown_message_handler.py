@@ -20,6 +20,6 @@ async def unknown_message_handler(message: Message):
 
     # Отправка сообщения с кнопкой для поделки номера телефона
     await message.answer(
-        "Чтобы поделиться вашим номером нажмите кнопку ниже",
+        "⬇️⬇️⬇️Для получения купона нужно поделиться номером по кнопке ниже⬇️⬇️⬇️",
         reply_markup=phone_button
     )
