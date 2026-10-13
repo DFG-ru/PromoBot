@@ -1,6 +1,8 @@
 from pathlib import Path
 import csv
-import os
+import io
+
+import aiofiles
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # Переходим из middlewares в корень bot
@@ -9,11 +11,38 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 user_db_path = DATA_DIR / 'UserDatabase.csv'
 
-def write(user_id, first_name, last_name, username, phone_number=None, coupon_code=None):
-    file_exists = os.path.isfile(user_db_path)
-    with open(user_db_path, mode='a+', newline='', encoding='utf-8') as file:
+# 🔑 Константы для индексов столбцов (явное управление структурой)
+COLUMNS = {
+    'user_id': 0,
+    'first_name': 1,
+    'last_name': 2,
+    'username': 3,
+    'phone_number': 4,      # Номер телефона для поиска
+    'coupon_code': 5
+}
+MIN_COLUMNS = max(COLUMNS.values()) + 1  # Минимальное кол-во столбцов = 6
+
+
+async def _read_rows():
+    """Читает весь CSV и возвращает список строк (парсинг — в памяти)."""
+    async with aiofiles.open(user_db_path, mode='r', encoding='utf-8', newline='') as file:
+        content = await file.read()
+    return list(csv.reader(io.StringIO(content)))
+
+
+async def _write_rows(rows):
+    """Сериализует строки через csv.writer в памяти и асинхронно записывает файл."""
+    buffer = io.StringIO(newline='')
+    writer = csv.writer(buffer)
+    writer.writerows(rows)
+    async with aiofiles.open(user_db_path, mode='w', encoding='utf-8', newline='') as file:
+        await file.write(buffer.getvalue())
+
+
+async def write(user_id, first_name, last_name, username, phone_number=None, coupon_code=None):
+    async with aiofiles.open(user_db_path, mode='a+', newline='', encoding='utf-8') as file:
         writer = csv.writer(file, delimiter=',')
-        writer.writerow([
+        await writer.writerow([
             user_id,
             first_name or None,
             last_name or None,
@@ -23,40 +52,26 @@ def write(user_id, first_name, last_name, username, phone_number=None, coupon_co
         ])
 
 
-def update(phone_number, new_data):
+async def update(phone_number, new_data):
     if not user_db_path.is_file():
-            return False
-
-    # 🔑 Константы для индексов столбцов (явное управление структурой)
-    COLUMNS = {
-        'user_id': 0,
-        'first_name': 1,
-        'last_name': 2,
-        'username': 3,
-        'phone_number': 4,      # Номер телефона для поиска
-        'coupon_code': 5
-    }
-    MIN_COLUMNS = max(COLUMNS.values()) + 1  # Минимальное кол-во столбцов = 6
+        return False
 
     updated = False
-    rows = []
 
     # 1️⃣ Читаем все данные
-    with open(user_db_path, mode='r', encoding='utf-8') as file:
-        reader = csv.reader(file)
-        rows = list(reader)
+    rows = await _read_rows()
 
     # 2️⃣ Ищем запись по номеру телефона
     for i, row in enumerate(rows):
         # Защита от коротких строк (меньше 5 столбцов)
         if len(row) <= COLUMNS['phone_number']:
             continue
-            
+
         if row[COLUMNS['phone_number']] == phone_number:
             # 3️⃣ Дополняем строку до минимальной длины, если нужно
             if len(row) < MIN_COLUMNS:
                 row.extend([''] * (MIN_COLUMNS - len(row)))
-            
+
             # 4️⃣ ТОЧЕЧНОЕ ОБНОВЛЕНИЕ: меняем ТОЛЬКО указанные поля
             for field, value in new_data.items():
                 if field in COLUMNS:  # Проверяем, что поле существует в структуре
@@ -65,56 +80,40 @@ def update(phone_number, new_data):
                     if col_idx >= len(row):
                         row.extend([''] * (col_idx - len(row) + 1))
                     row[col_idx] = value
-            
+
             updated = True
             break  # Обновляем только первую найденную запись
 
     # 5️⃣ Сохраняем изменения
     if updated:
-        with open(user_db_path, mode='w', encoding='utf-8', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(rows)
-    
-    return updated
-    
-    
-def update_coupon(phone_number, new_data):
-    if not user_db_path.is_file():
-            return False
+        await _write_rows(rows)
 
-    # 🔑 Константы для индексов столбцов (явное управление структурой)
-    COLUMNS = {
-        'user_id': 0,
-        'first_name': 1,
-        'last_name': 2,
-        'username': 3,
-        'phone_number': 4,      # Номер телефона для поиска
-        'coupon_code': 5
-    }
-    MIN_COLUMNS = max(COLUMNS.values()) + 1  # Минимальное кол-во столбцов = 6
+    return updated
+
+
+async def update_coupon(phone_number, new_data):
+    if not user_db_path.is_file():
+        return False
 
     updated = False
-    rows = []
 
     # 1️⃣ Читаем все данные
-    with open(user_db_path, mode='r', encoding='utf-8') as file:
-        reader = csv.reader(file)
-        rows = list(reader)
+    rows = await _read_rows()
 
-    # 2️⃣ Ищем запись по номеру телефона
+    # 2️⃣ Ищем запись по номеру телефона с пустым купоном
     for i, row in enumerate(rows):
         # Защита от коротких строк (меньше 5 столбцов)
         if len(row) <= COLUMNS['phone_number']:
             continue
-            
+
         # Убедимся, что в строке есть хотя бы столбец coupon_code
         coupon_value = row[COLUMNS['coupon_code']] if len(row) > COLUMNS['coupon_code'] else ''
-            
+
         if row[COLUMNS['phone_number']] == phone_number and coupon_value == '':
             # 3️⃣ Дополняем строку до минимальной длины, если нужно
             if len(row) < MIN_COLUMNS:
                 row.extend([''] * (MIN_COLUMNS - len(row)))
-            
+
             # 4️⃣ ТОЧЕЧНОЕ ОБНОВЛЕНИЕ: меняем ТОЛЬКО указанные поля
             for field, value in new_data.items():
                 if field in COLUMNS:  # Проверяем, что поле существует в структуре
@@ -123,60 +122,55 @@ def update_coupon(phone_number, new_data):
                     if col_idx >= len(row):
                         row.extend([''] * (col_idx - len(row) + 1))
                     row[col_idx] = value
-            
+
             updated = True
             break  # Обновляем только первую найденную запись
 
     # 5️⃣ Сохраняем изменения
     if updated:
-        with open(user_db_path, mode='w', encoding='utf-8', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerows(rows)
-    
+        await _write_rows(rows)
+
     return updated
 
 
-def phone_exist(phone_number):
+async def phone_exist(phone_number):
     if not user_db_path.is_file():
         return False
-    with open(user_db_path, mode='r', encoding='utf-8') as file:
-        reader = csv.reader(file)
+    rows = await _read_rows()
 
-        # Читаем строки по одной
-        for row in reader:
-            if row[4] == phone_number:
-                return True
+    # Проходим по всем строкам
+    for row in rows:
+        if len(row) > COLUMNS['phone_number'] and row[4] == phone_number:
+            return True
 
-        # Номер не найден
-        return False
+    # Номер не найден
+    return False
 
 
-def coupon_exist(user_id, coupon_mask):
+async def coupon_exist(user_id, coupon_mask):
     user_id = str(user_id)
     if not user_db_path.is_file():
         return False
-    with open(user_db_path, mode='r', encoding='utf-8') as file:
-        reader = csv.reader(file)
+    rows = await _read_rows()
 
-        # Читаем строки по одной
-        for row in reader:
-            if row[0] == user_id:
-                if row[5][:7] == coupon_mask:
-                    return True
+    # Проходим по всем строкам
+    for row in rows:
+        if len(row) > COLUMNS['coupon_code'] and row[0] == user_id:
+            if row[5][:7] == coupon_mask:
+                return True
 
-        # Номер не найден
-        return False
+    # Купон не найден
+    return False
 
 
-def get_user_coupon(phone_number, coupon_mask):
+async def get_user_coupon(phone_number, coupon_mask):
     if not user_db_path.is_file():
         return None
-    with open(user_db_path, mode='r', encoding='utf-8') as file:
-        reader = csv.reader(file)
-        for row in reader:
-            if row[4] == phone_number:
-                if row[5] == "":
-                    return None
-                if row[5][:7] == coupon_mask:
-                    return row[5]
+    rows = await _read_rows()
+    for row in rows:
+        if len(row) > COLUMNS['coupon_code'] and row[4] == phone_number:
+            if row[5] == "":
+                return None
+            if row[5][:7] == coupon_mask:
+                return row[5]
     return None
