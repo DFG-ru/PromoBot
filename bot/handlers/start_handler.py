@@ -7,6 +7,8 @@ from datetime import datetime
 # from middlewares import userDatabase_funcs as userDB
 import logging
 
+import aiofiles
+
 # Константа для приветственного сообщения
 WELCOME_MESSAGE = (
     "Здравствуйте! Чтобы получить купон, поделитесь номером телефона с помощью кнопки ниже⬇️⬇️⬇️"
@@ -33,9 +35,9 @@ async def start_handler(message: Message, bot_instance):
     visit_history_path = Path('data') / 'VisitHistory.txt'
     visit_history_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(visit_history_path, 'a+', encoding='utf-8') as used_codes:
+    async with aiofiles.open(visit_history_path, 'a+', encoding='utf-8') as used_codes:
 
-            used_codes.write(f"{last_active};{user_id};{username};{full_name};{bot_instance.botname}\n")  # добавляем код с новой строкой
+            await used_codes.write(f"{last_active};{user_id};{username};{full_name};{bot_instance.botname}\n")  # добавляем код с новой строкой
     
     await message.answer(
         WELCOME_MESSAGE,
