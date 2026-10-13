@@ -40,6 +40,7 @@
 !bot/routers/__init__.py
 !requirements/Install_requirements.bat
 !requirements/Shentox-Regular (RUS by Slavchansky)_0.ttf
+!requirements/requirements.txt
 
 ### Все что ниже игнорируется по умолчанию
 
@@ -61,7 +62,7 @@ __pycache__/
 *.log
 
 # Исключаем текстовые файлы
-*.txt
+
 
 # Исключаем конфигурационные файлы
 *.cfg
