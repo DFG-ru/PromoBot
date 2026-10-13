@@ -42,7 +42,27 @@ async def contact_handler(message: Message, bot_instance):
     
     
     if coupon_code == None and datetime.date.today() < datetime.date(2026, 1, 1):
-        coupon_code = await couponDB.get_random_coupon_code(bot_instance.coupon_mask)
+        try:
+            coupon_code = await couponDB.get_random_coupon_code(bot_instance.coupon_mask)
+        except FileNotFoundError:
+            logging.error("Файл CouponCodes.txt не найден — выдача купонов невозможна")
+            await message.answer(
+                "Купоны временно недоступны. Попробуйте позже.",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+            return
+        except ValueError:
+            logging.warning("Свободные купоны закончились")
+            await message.answer(
+                "К сожалению, все купоны уже разыграны.\n"
+                "\n"
+                f"Следите за новыми предложениями в нашем телеграмм канале:\n"
+                f"\n"
+                f"https://t.me/samaragastro\n"
+                f"💎💎💎\n",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+            return
         new_data = {
             'coupon_code': coupon_code
         }

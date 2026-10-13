@@ -2,8 +2,10 @@ import asyncio
 import os
 from datetime import datetime
 from aiogram import Bot, Dispatcher
+from aiogram.types import ErrorEvent
 from routers import setup_router
 import logging
+
 
 class BotInstance:
     def __init__(self, botname: str, token: str, template: str, coupon_mask: str, social_media_url: str, website_url: str):
@@ -20,6 +22,8 @@ class BotInstance:
         if not self.init_done:
             setup_router(self.dp)
             self.dp.update.outer_middleware(self.middleware)
+            # Глобальный перехватчик необработанных исключений в хэндлерах
+            self.dp.errors.register(error_handler)
             self.init_done = True
 
     async def middleware(self, handler, event, data):
@@ -40,3 +44,26 @@ class BotInstance:
             await self.dp.start_polling(bot)
         finally:
             await bot.session.close()
+
+
+async def error_handler(event: ErrorEvent):
+    """Глобальный обработчик ошибок aiogram 3.x (dp.errors).
+
+    Логирует traceback и уведомляет пользователя, что его запрос не удалось
+    обработать, вместо тихого падения обработки апдейта.
+    """
+    update = event.update
+    exception = event.exception
+    logging.exception(
+        f"Необработанное исключение при обработке апдейта "
+        f"{getattr(update, 'update_id', '?')}: {exception}"
+    )
+    message = getattr(update, 'message', None) or getattr(update, 'edited_message', None)
+    if message is not None:
+        try:
+            await message.answer(
+                "Произошла ошибка при обработке вашего запроса. "
+                "Попробуйте ещё раз позже."
+            )
+        except Exception:
+            logging.exception("Не удалось отправить пользователю сообщение об ошибке")

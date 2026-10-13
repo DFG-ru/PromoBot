@@ -40,16 +40,20 @@ async def _write_rows(rows):
 
 
 async def write(user_id, first_name, last_name, username, phone_number=None, coupon_code=None):
+    # csv.writer не работает с асинхронными файловыми объектами,
+    # поэтому сериализуем строку в памяти и пишем через aiofiles.
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow([
+        user_id,
+        first_name or None,
+        last_name or None,
+        username or None,
+        phone_number or None,
+        coupon_code or None
+    ])
     async with aiofiles.open(user_db_path, mode='a+', newline='', encoding='utf-8') as file:
-        writer = csv.writer(file, delimiter=',')
-        await writer.writerow([
-            user_id,
-            first_name or None,
-            last_name or None,
-            username or None,
-            phone_number or None,
-            coupon_code or None
-        ])
+        await file.write(buffer.getvalue())
 
 
 async def update(phone_number, new_data):
