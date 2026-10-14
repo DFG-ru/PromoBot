@@ -1,25 +1,17 @@
-from aiogram import types
-from aiogram.types import Message
-from .keyboards import phone_button
+"""Хэндлер сообщений, не распознанных роутером."""
 import logging
 
-async def unknown_message_handler(message: Message):
-    """
-    Обработчик неизвестных сообщений.
-    Предлагает пользователю поделиться своим номером телефона.
-    """
-    user_id = message.from_user.id
-    username = message.from_user.username or None
-    full_name = message.from_user.full_name or None
-    text = message.text
+from aiogram.types import Message
 
-    # Логирование информации о пользователе и сообщении
+from bot.handlers.keyboards import phone_button
+from bot.handlers.messages import UNKNOWN_MESSAGE
+
+
+async def unknown_message_handler(message: Message) -> None:
+    """Предлагает пользователю поделиться номером телефона по кнопке."""
+    user = message.from_user
     logging.info(
-        f"Unknown Command from user. | fullname={full_name}, username=@{username}, id={user_id}, text=\"{text}\""
+        f"Unknown Command from user. | fullname={user.full_name}, "
+        f"username=@{user.username or None}, id={user.id}, text=\"{message.text}\""
     )
-
-    # Отправка сообщения с кнопкой для поделки номера телефона
-    await message.answer(
-        "⬇️⬇️⬇️Для получения купона нужно поделиться номером по кнопке ниже⬇️⬇️⬇️",
-        reply_markup=phone_button
-    )
+    await message.answer(UNKNOWN_MESSAGE, reply_markup=phone_button)
