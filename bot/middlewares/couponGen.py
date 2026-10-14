@@ -32,9 +32,12 @@ def resolve_font_path(font: str | None) -> Path | None:
             candidates.extend([FONTS_DIR / font, REQUIREMENTS_DIR / font])
     candidates.append(FONTS_DIR / DEFAULT_FONT_NAME)
 
+    logging.debug(f"Поиск шрифта {font!r}, кандидаты: {[str(c) for c in candidates]}")
     for candidate in candidates:
         if candidate.is_file():
+            logging.debug(f"Шрифт найден: {candidate}")
             return candidate
+        logging.debug(f"Шрифт не найден по пути: {candidate}")
     logging.error(f"Шрифт {font!r} не найден ни в одном из каталогов: "
                   f"{', '.join(str(c.parent) for c in candidates)}")
     return None
@@ -53,13 +56,17 @@ async def saveImage(img: Image, s: str):
     output_path = OUTPUT_DIR / f"{s}.jpg"
     buffer = io.BytesIO()
     img.convert('RGB').save(buffer, format='JPEG')
+    logging.debug(f"Сохранение изображения купона: {output_path} ({len(buffer.getvalue())} байт)")
     async with aiofiles.open(output_path, 'wb') as f:
         await f.write(buffer.getvalue())
+    logging.debug(f"Изображение купона сохранено: {output_path}")
     return output_path
 
 
 def get_substrate_path(template: str):
-    return TEMPLATES_DIR / template
+    path = TEMPLATES_DIR / template
+    logging.debug(f"Путь к подложке купона: {path}")
+    return path
     
 
 def drawNumber(img, s, xy=(0, 0), size=58, font: str | None = None):
@@ -72,9 +79,11 @@ def drawNumber(img, s, xy=(0, 0), size=58, font: str | None = None):
     font_path = resolve_font_path(font)
     idraw = ImageDraw.Draw(img, "RGBA")
     if font_path is None:
+        logging.debug("Шрифт не разрешён — пропуск нанесения номера купона")
         return
     try:
         truetype_font = ImageFont.truetype(str(font_path), size)
+        logging.debug(f"Нанесение номера {s!r} в {xy}, размер {size}, шрифт {font_path}")
         idraw.text(xy, s, (255, 255, 255, 88), anchor="mt", font=truetype_font)
     except OSError:
         logging.error(f"Не удалось загрузить шрифт {font_path}, номер купона не нанесён")
@@ -82,18 +91,22 @@ def drawNumber(img, s, xy=(0, 0), size=58, font: str | None = None):
 
 async def couponGen(template: str, coupon, font: str | None = None):
     coupon = str(coupon)
+    logging.debug(f"couponGen старт: template={template!r}, coupon={coupon!r}, font={font!r}")
     path_to_substrate = get_substrate_path(template)
     if not path_to_substrate.is_file():
         logging.error(f"Шаблон купона не найден: {path_to_substrate}")
         return False
 
     qr = gen_qr_code(coupon)
+    logging.debug(f"QR-код сгенерирован: coupon={coupon!r}, размер qr={qr.size}")
     qr_xy = (52, 651)
     qr_width, qr_height = qr.size
     fontcords = (qr_xy[0] + qr_width / 2, qr_xy[1] + qr_width + 3)
+    logging.debug(f"Координаты QR: {qr_xy}, координаты номера: {fontcords}")
 
     try:
         substrate = Image.open(path_to_substrate).convert("RGBA")
+        logging.debug(f"Подложка открыта: {path_to_substrate}, размер {substrate.size}")
     except (FileNotFoundError, UnidentifiedImageError):
         logging.error(f"Шаблон купона не найден или повреждён: {path_to_substrate}")
         return False
@@ -105,6 +118,7 @@ async def couponGen(template: str, coupon, font: str | None = None):
         output_img.paste(alpha, qr_xy, alpha)
 
         output_img.paste(qr, qr_xy, qr)
+        logging.debug("QR-код наложен на подложку")
     finally:
         substrate.close()
 
@@ -112,11 +126,13 @@ async def couponGen(template: str, coupon, font: str | None = None):
     await saveImage(output_img, coupon[7:])
 
     logging.info(f"QR {coupon} создан")
+    logging.debug(f"couponGen завершён: coupon={coupon!r}")
     return True
 
 
 def gen_qr_code(text):
     text = str(text)
+    logging.debug(f"Генерация QR-кода для текста: {text!r}")
     
     qr = qrcode.QRCode(
         version=1,
@@ -127,6 +143,7 @@ def gen_qr_code(text):
     qr.add_data(text)
     qr.make(fit=True)
     img = qr.get_matrix()
+    logging.debug(f"QR-матрица построена: версия {qr.version}, размер матрицы {len(img)}x{len(img[0]) if img else 0}")
     # for i in img:
         # for j in i:
             # if j:
