@@ -1,3 +1,9 @@
-from .couponGen import couponGen
-from . import userDatabase_funcs
-from . import couponCodes_funcs
+from bot.middlewares import coupon_codes, coupon_generator, user_database
+from bot.middlewares.coupon_generator import generate_coupon_image
+
+__all__ = [
+    "coupon_codes",
+    "coupon_generator",
+    "user_database",
+    "generate_coupon_image",
+]

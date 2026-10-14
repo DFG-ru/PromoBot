@@ -1,10 +1,11 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+"""Клавиатуры бота."""
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
-# Создание кнопки для отправки контакта
-share_phone_button = KeyboardButton(text='Поделиться номером ☎', request_contact=True)
+# Кнопка для отправки контакта (номера телефона)
+share_phone_button = KeyboardButton(text="Поделиться номером ☎", request_contact=True)
 
-# Создание клавиатуры с кнопкой
+# Клавиатура с одной кнопкой
 phone_button = ReplyKeyboardMarkup(
     keyboard=[[share_phone_button]],
-    resize_keyboard=True
+    resize_keyboard=True,
 )

@@ -1,45 +1,30 @@
-from pathlib import Path
-import os
-from aiogram import types
-from aiogram.types import Message
-from .keyboards import phone_button
+"""Хэндлер команды /start."""
+import logging
 from datetime import datetime
 
-import logging
+from aiogram.types import Message
 
-BASE_DIR = Path(__file__).resolve().parent.parent  # Переходим из handlers в корень bot
-DATA_DIR = BASE_DIR / 'data'
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-VISIT_HISTORY_PATH = DATA_DIR / 'VisitHistory.txt'
+from bot.handlers.keyboards import phone_button
+from bot.handlers.messages import WELCOME_MESSAGE
+from bot.paths import VISIT_HISTORY_PATH
 
-# Константа для приветственного сообщения
-WELCOME_MESSAGE = (
-    "Здравствуйте! Чтобы получить купон, поделитесь номером телефона с помощью кнопки ниже⬇️⬇️⬇️"
-)
 
-async def start_handler(message: Message, bot_instance):
-    """
-    Обработчик команды /start.
-    Отправляет приветственное сообщение с кнопкой, чтобы поделиться номером телефона.
-    """
+async def start_handler(message: Message, bot_instance) -> None:
+    """Отправляет приветствие с кнопкой «поделиться номером» и пишет историю посещений."""
+    user = message.from_user
+    user_id = user.id
+    username = user.username or None
+    full_name = user.full_name or None
 
-    user_id = message.from_user.id
-    username = message.from_user.username or None
-    full_name = message.from_user.full_name or None
-    last_active = datetime.now().isoformat()
+    logging.info(f"User logged in. | fullname={full_name}, username=@{username}, id={user_id}")
 
-    # Логирование информации о пользователе
-    logging.info(
-        f"User logged in. | fullname={full_name}, username=@{username}, id={user_id}"
-    )
-    # Отправка приветственного сообщения с кнопкой, чтобы поделиться номером телефона
-    visit_history_path = VISIT_HISTORY_PATH
+    # История посещений: timestamp;user_id;username;fullname;botname
+    try:
+        with open(VISIT_HISTORY_PATH, "a+", encoding="utf-8") as history:
+            history.write(f"{datetime.now().isoformat()};{user_id};"
+                          f"{username};{full_name};{bot_instance.botname}\n")
+    except OSError:
+        # Файл истории не критичен для выдачи купона — только сигнал в лог
+        logging.exception(f"Не удалось записать визит пользователя id={user_id}")
 
-    with open(visit_history_path, 'a+', encoding='utf-8') as used_codes:
-
-            used_codes.write(f"{last_active};{user_id};{username};{full_name};{bot_instance.botname}\n")  # добавляем код с новой строкой
-    
-    await message.answer(
-        WELCOME_MESSAGE,
-        reply_markup=phone_button
-    )
+    await message.answer(WELCOME_MESSAGE, reply_markup=phone_button)

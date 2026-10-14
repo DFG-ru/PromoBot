@@ -1,15 +1,18 @@
-import datetime
+"""Класс BotRunner: жизненный цикл одного экземпляра бота (aiogram 3.x)."""
 import logging
+from datetime import datetime
 
 from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramUnauthorizedError
 from aiogram.types import ErrorEvent
 
-from config_loader import mask_token
-from routers import setup_router
+from bot.routers import setup_router
+from bot.settings import mask_token
 
 
-class BotInstance:
+class BotRunner:
+    """Один запущенный бот: токен, шаблон купона, окно акции и диспетчер."""
+
     def __init__(self, token: str, template: str, coupon_mask: str, social_media_url: str,
                  website_url: str, promo_end_date: str | None = None, font: str | None = None):
         """Экземпляр бота.
@@ -35,13 +38,13 @@ class BotInstance:
         self.dp = Dispatcher()
         self.init_done = False
 
-    def set_promo_end_date(self, value):
+    def set_promo_end_date(self, value) -> None:
         """Парсит и сохраняет дату окончания акции; при ошибке — выдача закрыта."""
         logging.debug(f"set_promo_end_date({value!r}) для бота {mask_token(self.token)}")
         if not value:
             return
         try:
-            self.promo_end_date = datetime.datetime.strptime(str(value), "%Y-%m-%d").date()
+            self.promo_end_date = datetime.strptime(str(value), "%Y-%m-%d").date()
             logging.debug(f"Дата окончания акции установлена: {self.promo_end_date}")
         except ValueError:
             logging.error(
@@ -56,47 +59,49 @@ class BotInstance:
         """Окно акции открыто, если дата задана и сегодня <= promo_end_date."""
         if self.promo_end_date is None:
             return False
-        return datetime.date.today() <= self.promo_end_date
+        return datetime.now().date() <= self.promo_end_date
 
-    async def setup_router(self):
+    async def setup(self) -> None:
+        """Однократно собирает диспетчер: роутеры, middleware, error-handler."""
         if not self.init_done:
             setup_router(self.dp)
-            self.dp.update.outer_middleware(self.middleware)
+            self.dp.update.outer_middleware(self.inject_instance)
             # Глобальный перехватчик необработанных исключений в хэндлерах
             self.dp.errors.register(error_handler)
             self.init_done = True
 
-    async def middleware(self, handler, event, data):
-        data['bot_instance'] = self
+    async def inject_instance(self, handler, event, data):
+        """Пробрасывает текущий BotRunner во все хэндлеры как `bot_instance`."""
+        data["bot_instance"] = self
         return await handler(event, data)
 
-    async def run(self):
+    async def run(self) -> None:
         logging.debug(f"run(): инициализация бота {mask_token(self.token)}")
         bot = Bot(self.token)
         try:
-            botInfo = await bot.get_me()
-            logging.debug(f"get_me() успешен: id={botInfo.id}, username=@{botInfo.username}")
+            me = await bot.get_me()
+            logging.debug(f"get_me() успешен: id={me.id}, username=@{me.username}")
         except TelegramUnauthorizedError:
             logging.error(f"Неверный токен {mask_token(self.token)} — бот не запущен")
-            print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - '
-                  f'Бот {mask_token(self.token)}: неверный токен, пропуск')
+            print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - "
+                  f"Бот {mask_token(self.token)}: неверный токен, пропуск")
             await bot.session.close()
             return
-        self.botname = botInfo.first_name
-        logging.info(f"Инициализация бота \"{botInfo.first_name}\", ID: {botInfo.id}")
-        print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - Бот {botInfo.first_name} запущен')
+        self.botname = me.first_name
+        logging.info(f"Инициализация бота \"{me.first_name}\", ID: {me.id}")
+        print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Бот {me.first_name} запущен")
 
-        await self.setup_router()
+        await self.setup()
 
         await bot.delete_webhook(drop_pending_updates=True)
         try:
-            logging.info(f"Бот \"{botInfo.first_name}\" запущен")
+            logging.info(f"Бот \"{me.first_name}\" запускает polling")
             await self.dp.start_polling(bot)
         finally:
             await bot.session.close()
 
 
-async def error_handler(event: ErrorEvent):
+async def error_handler(event: ErrorEvent) -> None:
     """Глобальный обработчик ошибок aiogram 3.x (dp.errors).
 
     Логирует traceback и уведомляет пользователя, что его запрос не удалось
@@ -108,7 +113,7 @@ async def error_handler(event: ErrorEvent):
         f"Необработанное исключение при обработке апдейта "
         f"{getattr(update, 'update_id', '?')}: {exception}"
     )
-    message = getattr(update, 'message', None) or getattr(update, 'edited_message', None)
+    message = getattr(update, "message", None) or getattr(update, "edited_message", None)
     if message is not None:
         try:
             await message.answer(
