@@ -3,13 +3,41 @@ import logging
 
 import aiofiles
 import qrcode
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent  # Директория middlewares
 OUTPUT_DIR = BASE_DIR / 'output'
 TEMPLATES_DIR = BASE_DIR / 'templates'
+FONTS_DIR = BASE_DIR / 'fonts'
+# Запасной каталог шрифтов в корне репозитория
+REQUIREMENTS_DIR = BASE_DIR.parent.parent / 'requirements'
+
+DEFAULT_FONT_NAME = 'Shentox-Regular (RUS by Slavchansky).ttf'
+
+
+def resolve_font_path(font: str | None) -> Path | None:
+    """Находит файл шрифта, указанный в конфиге бота (поле font).
+
+    Порядок поиска: абсолютный путь -> bot/middlewares/fonts/ -> requirements/.
+    Если ничего не найдено — возвращает None (купон генерируется без номера).
+    """
+    candidates = []
+    if font:
+        p = Path(font)
+        if p.is_absolute():
+            candidates.append(p)
+        else:
+            candidates.extend([FONTS_DIR / font, REQUIREMENTS_DIR / font])
+    candidates.append(FONTS_DIR / DEFAULT_FONT_NAME)
+
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    logging.error(f"Шрифт {font!r} не найден ни в одном из каталогов: "
+                  f"{', '.join(str(c.parent) for c in candidates)}")
+    return None
 
 # Гарантируем существование директорий
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -34,24 +62,30 @@ def get_substrate_path(template: str):
     return TEMPLATES_DIR / template
     
 
-def drawNumber(img, s, xy=(0,0), size=58):
+def drawNumber(img, s, xy=(0, 0), size=58, font: str | None = None):
     """Наносит номер купона на изображение.
 
-    Используется шрифт из системного каталога шрифтов; если шрифт или
-    файл купона отсутствуют — фиксируется ошибка в лог и возврат без падения бота.
+    Шрифт берётся из конфигурации бота (поле font) и ищется через
+    resolve_font_path(); если шрифт не найден — фиксируется ошибка в лог,
+    купон генерируется без номера, без падения бота.
     """
-    font_path = BASE_DIR / 'fonts' / 'Shentox-Regular (RUS by Slavchansky).ttf'
+    font_path = resolve_font_path(font)
     idraw = ImageDraw.Draw(img, "RGBA")
+    if font_path is None:
+        return
     try:
-        font = ImageFont.truetype(str(font_path), size)
-        idraw.text(xy, s, (255, 255, 255, 88), anchor="mt", font=font)
+        truetype_font = ImageFont.truetype(str(font_path), size)
+        idraw.text(xy, s, (255, 255, 255, 88), anchor="mt", font=truetype_font)
     except OSError:
-        logging.error(f"Не найден шрифт {font_path}, номер купона не нанесён")
+        logging.error(f"Не удалось загрузить шрифт {font_path}, номер купона не нанесён")
 
 
-async def couponGen(template: str, coupon):
+async def couponGen(template: str, coupon, font: str | None = None):
     coupon = str(coupon)
     path_to_substrate = get_substrate_path(template)
+    if not path_to_substrate.is_file():
+        logging.error(f"Шаблон купона не найден: {path_to_substrate}")
+        return False
 
     qr = gen_qr_code(coupon)
     qr_xy = (52, 651)
@@ -60,8 +94,8 @@ async def couponGen(template: str, coupon):
 
     try:
         substrate = Image.open(path_to_substrate).convert("RGBA")
-    except FileNotFoundError:
-        logging.error(f"Шаблон купона не найден: {path_to_substrate}")
+    except (FileNotFoundError, UnidentifiedImageError):
+        logging.error(f"Шаблон купона не найден или повреждён: {path_to_substrate}")
         return False
 
     try:
@@ -74,7 +108,7 @@ async def couponGen(template: str, coupon):
     finally:
         substrate.close()
 
-    drawNumber(output_img, coupon[7:], fontcords, 40)
+    drawNumber(output_img, coupon[7:], fontcords, 40, font=font)
     await saveImage(output_img, coupon[7:])
 
     logging.info(f"QR {coupon} создан")

@@ -4,8 +4,13 @@ from aiogram import types
 from aiogram.types import Message
 from .keyboards import phone_button
 from datetime import datetime
-# from middlewares import userDatabase_funcs as userDB
+
 import logging
+
+BASE_DIR = Path(__file__).resolve().parent.parent  # Переходим из handlers в корень bot
+DATA_DIR = BASE_DIR / 'data'
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+VISIT_HISTORY_PATH = DATA_DIR / 'VisitHistory.txt'
 
 # Константа для приветственного сообщения
 WELCOME_MESSAGE = (
@@ -27,11 +32,8 @@ async def start_handler(message: Message, bot_instance):
     logging.info(
         f"User logged in. | fullname={full_name}, username=@{username}, id={user_id}"
     )
-    # logging.info(f"New user authorized. | fullname={full_name}, username=@{username}, id={user_id}")
-    # userDB.write(user.id, user.first_name, user.last_name, user.username, contact.phone_number)
     # Отправка приветственного сообщения с кнопкой, чтобы поделиться номером телефона
-    visit_history_path = Path('data') / 'VisitHistory.txt'
-    visit_history_path.parent.mkdir(parents=True, exist_ok=True)
+    visit_history_path = VISIT_HISTORY_PATH
 
     with open(visit_history_path, 'a+', encoding='utf-8') as used_codes:
 

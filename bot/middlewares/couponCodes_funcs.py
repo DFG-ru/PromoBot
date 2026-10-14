@@ -1,65 +1,77 @@
-from pathlib import Path
-import os
+import asyncio
+import logging
 import random
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # Переходим из middlewares в корень bot
 DATA_DIR = BASE_DIR / 'data'
-DATA_DIR.mkdir(parents=True, exist_ok=True) # Гарантируем существование папки data
+DATA_DIR.mkdir(parents=True, exist_ok=True)  # Гарантируем существование папки data
 
 coupon_db_path = DATA_DIR / 'CouponCodes.txt'
 used_coupon_db_path = DATA_DIR / 'UsedCouponCodes.txt'
 
-def read(mask: str):
-    coupon_codes = []
+# Лок защищает операцию «выбрать свободный код -> пометить использованным»
+# от гонок: без него два одновременных запроса могли получить один и тот же код.
+_coupon_lock = asyncio.Lock()
+
+
+def read(mask: str) -> list[str]:
+    """Возвращает список всех кодов с указанным маскированным префиксом."""
+    codes = []
     if coupon_db_path.is_file():
         with open(coupon_db_path, mode='r', encoding='utf-8') as file:
-            coupon_codes = [line.splitlines() for line in file if mask in line]
-    return coupon_codes[0]
-    
-# def write(coupon_codes):
-    # with open(coupon_db_path, mode='w', encoding='utf-8') as file:
-        # file.write("\n".join(coupon_codes) + "\n")
-        
-def get_random_coupon_code(mask: str):
-    print('Вход в get_random_coupon_code(' + mask + ')')
-    if not coupon_db_path.exists():
-        raise FileNotFoundError("Файл CouponCodes.txt не найден.")
-    if not used_coupon_db_path.exists():
-        open(used_coupon_db_path, 'a').close()
-    
-    with open(coupon_db_path, "r", encoding="utf-8") as file, open(used_coupon_db_path, 'r') as used_codes:
-        codes = [line.strip() for line in file if mask in line.strip() and line not in used_codes]
-    if not codes:
-        raise ValueError("Файл CouponCodes.txt пуст.")
-        return ''
+            for line in file:
+                code = line.strip()
+                if code and mask in code:
+                    codes.append(code)
+    return codes
 
-    selected_code = random.choice(codes)
-    print('get_random_coupon_code:selected_code = ' + selected_code)
-    
-    # Записываем свободный код в файл с использоваными кодами
-    mark_code_as_used(selected_code)
-    
-    return selected_code
-    
 
-def mark_code_as_used(code_to_find):
+def _read_used_codes() -> set[str]:
+    """Читает множество уже использованных кодов (без учёта регистра пробелов)."""
+    used = set()
+    if used_coupon_db_path.is_file():
+        with open(used_coupon_db_path, mode='r', encoding='utf-8') as file:
+            for line in file:
+                code = line.strip()
+                if code:
+                    used.add(code)
+    return used
+
+
+async def get_random_coupon_code(mask: str) -> str:
+    """Выбирает случайный свободный код купона и помечает его использованным.
+
+    Бросает FileNotFoundError, если база кодов отсутствует,
+    ValueError — если свободные коды закончились.
     """
-    Функция ищет указанный код в файле с кодами,
-    и если находит, добавляет его в файл использованных кодов.
-    """
-    # Открываем файл с кодами для чтения
-    with open(coupon_db_path, 'r') as codes:
-        # Читаем все строки в список
-        all_codes = codes.read().splitlines()
-        
-    # Проверяем, есть ли указанный код среди всех кодов
+    async with _coupon_lock:
+        if not coupon_db_path.is_file():
+            raise FileNotFoundError("Файл CouponCodes.txt не найден.")
+
+        all_codes = read(mask)
+        used_codes = _read_used_codes()
+        free_codes = [code for code in all_codes if code not in used_codes]
+
+        if not free_codes:
+            raise ValueError("Свободные купоны закончились.")
+
+        selected_code = random.choice(free_codes)
+
+        # Помечаем код использованным (файл создаётся автоматически при необходимости)
+        mark_code_as_used(selected_code)
+
+        logging.info(f"Выдан купон {selected_code} (маска {mask}), "
+                     f"свободно осталось: {len(free_codes) - 1}")
+        return selected_code
+
+
+def mark_code_as_used(code_to_find: str):
+    """Добавляет указанный код в файл использованных кодов, если он есть в базе."""
+    all_codes = read('')
     if code_to_find in all_codes:
-        print(f"Код '{code_to_find}' найден.")
-        
-        # Добавляем код в файл использованных кодов
-        with open(used_coupon_db_path, 'a+') as used_codes:
-            used_codes.write(f"{code_to_find}\n")  # добавляем код с новой строкой
-            
-        print(f"Код '{code_to_find}' добавлен в файл использованных кодов.")
+        with open(used_coupon_db_path, 'a+', encoding='utf-8') as used_codes:
+            used_codes.write(f"{code_to_find}\n")
+        logging.info(f"Код '{code_to_find}' добавлен в файл использованных кодов.")
     else:
-        print(f"Код '{code_to_find}' не найден.")
+        logging.warning(f"Код '{code_to_find}' не найден в базе купонов.")
