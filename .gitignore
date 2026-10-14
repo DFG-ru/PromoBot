@@ -15,6 +15,7 @@
 !bot/data/
 !bot/handlers/
 !bot/middlewares/
+!bot/middlewares/fonts/
 !bot/middlewares/output/
 !bot/middlewares/templates/
 !bot/routers/
@@ -23,6 +24,8 @@
 # Разрешаем файлы внутри папок
 !bot/bot_instance.py
 !bot/bots_config.json.example
+!bot/config_loader.py
+!bot/config_paths.py
 !bot/main.py
 !bot/log/.gitkeep
 !bot/data/CouponCodes.txt.example
@@ -36,10 +39,11 @@
 !bot/middlewares/couponCodes_funcs.py
 !bot/middlewares/couponGen.py
 !bot/middlewares/userDatabase_funcs.py
+!bot/middlewares/fonts/.gitkeep
+!bot/middlewares/fonts/Shentox-Regular (RUS by Slavchansky).ttf
 !bot/middlewares/templates/.gitkeep
 !bot/routers/__init__.py
 !requirements/Install_requirements.bat
-!requirements/Shentox-Regular (RUS by Slavchansky)_0.ttf
 !requirements/requirements.txt
 
 ### Все что ниже игнорируется по умолчанию

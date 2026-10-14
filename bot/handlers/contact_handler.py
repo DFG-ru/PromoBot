@@ -1,12 +1,24 @@
+import logging
 import os
-from aiogram import F, types
+
+from aiogram import types
 from aiogram.types import Message, Contact, FSInputFile, ReplyKeyboardRemove
+
 from middlewares import couponGen
 from middlewares import couponCodes_funcs as couponDB
 from middlewares import userDatabase_funcs as userDB
 from middlewares.couponGen import OUTPUT_DIR
-import logging
-import datetime
+
+# Контактные данные из конфига бота (bot_instance.social_media_url / website_url)
+# подставляются в финальное сообщение вместо захардкоженных ссылок.
+
+
+def _promo_deadline_text(bot_instance) -> str:
+    """Формирует текст о дедлайне купона из конфигурации (promo_end_date)."""
+    if bot_instance.promo_end_date is not None:
+        return f"Вы можете использовать купон до {bot_instance.promo_end_date.strftime('%d.%m.%Y')} включительно."
+    return "Сроки действия купона уточняйте у организаторов акции."
+
 
 async def contact_handler(message: Message, bot_instance):
     """
@@ -38,10 +50,21 @@ async def contact_handler(message: Message, bot_instance):
 
     # Получение купона для пользователя
     coupon_code = await userDB.get_user_coupon(contact.phone_number, bot_instance.coupon_mask)
-    
-    
-    
-    if coupon_code == None and datetime.date.today() < datetime.date(2026, 1, 1):
+
+    if coupon_code is None:
+        # Окно акции определяется конфигом: date.today() <= promo_end_date.
+        # Если дата не задана или некорректна — выдача закрыта (безопасно по умолчанию).
+        if not bot_instance.promo_active:
+            await message.answer(
+                "Выдача купонов завершена.\n"
+                "\n"
+                f"Следите за новыми предложениями в нашем телеграмм канале:\n"
+                f"\n"
+                f"{bot_instance.social_media_url}\n"
+                f"💎💎💎\n",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+            return
         try:
             coupon_code = await couponDB.get_random_coupon_code(bot_instance.coupon_mask)
         except FileNotFoundError:
@@ -58,7 +81,7 @@ async def contact_handler(message: Message, bot_instance):
                 "\n"
                 f"Следите за новыми предложениями в нашем телеграмм канале:\n"
                 f"\n"
-                f"https://t.me/samaragastro\n"
+                f"{bot_instance.social_media_url}\n"
                 f"💎💎💎\n",
                 reply_markup=types.ReplyKeyboardRemove()
             )
@@ -68,24 +91,13 @@ async def contact_handler(message: Message, bot_instance):
         }
         await userDB.update_coupon(contact.phone_number, new_data)
         logging.info(f"User received a new coupon. | fullname={full_name}, username=@{username}, id={user_id}, coupon=\"{coupon_code}\"")
-    elif coupon_code == None and datetime.date.today() > datetime.date(2026, 1, 1):
-        await message.answer(
-        "Выдача купонов завершена.\n"
-        "\n"
-        f"Следите за новыми предложениями в нашем телеграмм канале:\n"
-        f"\n"
-        f"https://t.me/samaragastro\n"
-        f"💎💎💎\n",
-        reply_markup=types.ReplyKeyboardRemove()
-        )
-        return
-    
+
     qr_file_name = OUTPUT_DIR / f"{coupon_code[-6:]}.jpg"
 
     # Генерация QR-кода, если файл не существует
     if not os.path.exists(qr_file_name):
         logging.info(f"Generating QR code for coupon: {coupon_code}")
-        if not await couponGen(bot_instance.template, str(coupon_code)):
+        if not await couponGen.couponGen(bot_instance.template, str(coupon_code), font=bot_instance.font):
             logging.error(f"Не удалось сгенерировать купон: {coupon_code}")
             await message.answer(
                 "Не удалось сформировать ваш купон. Попробуйте позже.",
@@ -102,11 +114,11 @@ async def contact_handler(message: Message, bot_instance):
     )
     await message.answer_photo(photo=qr_file, reply_markup=ReplyKeyboardRemove())
     await message.answer(
-        "🎉Вы можете использовать купон до конца января 2026 года.\n"
+        f"🎉{_promo_deadline_text(bot_instance)}\n"
         "\n"
         f"Следите за новыми предложениями в нашем телеграмм канале:\n"
         f"\n"
-        f"https://t.me/samaragastro\n"
+        f"{bot_instance.social_media_url}\n"
         f"💎💎💎\n",
         reply_markup=types.ReplyKeyboardRemove()
     )

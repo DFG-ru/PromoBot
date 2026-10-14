@@ -1,50 +1,63 @@
 import asyncio
-import os
-import sys
 import logging
-from aiogram import Bot
+import sys
 from datetime import datetime
-import json
-from bot_instance import BotInstance
+
+from config_loader import load_bots_config, mask_token
+from config_paths import LOG_DIR
 
 logging.basicConfig(level=logging.INFO,
-                    filename="log/main_log.log", filemode="a+",
+                    filename=str(LOG_DIR / "main_log.log"), filemode="a+",
                     format="%(asctime)s - %(module)s - %(levelname)s - %(funcName)s: %(lineno)d - %(message)s",
                     datefmt='%H:%M:%S',
                     )
 
-def load_config(config_path: str):
-    with open(config_path, 'r', encoding='utf-8') as file:
-        config = json.load(file)
-    return config
+
+def _log(msg: str):
+    """Пишет сообщение и в консоль, и в лог."""
+    print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - {msg}')
+    logging.info(msg)
+
 
 async def main():
-    config_path = os.path.join(os.getcwd(), 'bots_config.json')
-    config = load_config(config_path)
+    # Понятная ошибка вместо трейсбека, если конфиг отсутствует/битый
+    try:
+        bots_config = load_bots_config()
+    except (FileNotFoundError, ValueError, KeyError) as exc:
+        _log(f"Ошибка загрузки конфигурации: {exc}")
+        logging.exception("Не удалось загрузить bots_config.json")
+        sys.exit(1)
+
+    from bot_instance import BotInstance  # импорт после настройки логов
+
     tasks = []
+    for bot_config in bots_config:
+        # Поле enabled (по умолчанию true) — позволяет выключить бота,
+        # не удаляя его запись из конфига.
+        if not bot_config["enabled"]:
+            _log(f"Бот {mask_token(bot_config['token'])} отключён (enabled=false), пропуск запуска")
+            continue
+        bot_instance = BotInstance(
+            token=bot_config["token"],
+            template=bot_config["template"],
+            coupon_mask=bot_config["coupon_mask"],
+            social_media_url=bot_config["social_media_url"],
+            website_url=bot_config["website_url"],
+            promo_end_date=bot_config["promo_end_date"],
+            font=bot_config["font"],
+        )
+        tasks.append(asyncio.create_task(bot_instance.run()))
 
-    if 'bots' in config:
-        for bot_config in config['bots']:
-            bot = Bot(bot_config.get('token'))
-            botInfo = await bot.get_me()
-            bot_instance = BotInstance(
-                botname=botInfo.first_name,
-                token=bot_config.get('token'),
-                template=bot_config.get('template'),
-                coupon_mask=bot_config.get('coupon_mask'),
-                social_media_url=bot_config.get('social_media_url'),
-                website_url=bot_config.get('website_url')
-            )
-            task = asyncio.create_task(bot_instance.run())
-            tasks.append(task)
+    if not tasks:
+        _log("В конфигурации нет ни одного включённого бота (все enabled=false или пустой список). Выход.")
+        return
 
-        await asyncio.gather(*tasks)
-    else:
-        raise KeyError("No bots configuration in JSON file")
+    await asyncio.gather(*tasks)
+
 
 if __name__ == "__main__":
-    print(f'{str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))} - Запуск бота(ов)...')
+    _log("Запуск бота(ов)...")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print(f'{str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))} - Exit')
+        _log("Exit")

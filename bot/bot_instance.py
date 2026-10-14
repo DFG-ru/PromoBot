@@ -1,22 +1,60 @@
-import asyncio
-import os
-from datetime import datetime
-from aiogram import Bot, Dispatcher
-from aiogram.types import ErrorEvent
-from routers import setup_router
+import datetime
 import logging
+
+from aiogram import Bot, Dispatcher
+from aiogram.exceptions import TelegramUnauthorizedError
+from aiogram.types import ErrorEvent
+
+from config_loader import mask_token
+from routers import setup_router
 
 
 class BotInstance:
-    def __init__(self, botname: str, token: str, template: str, coupon_mask: str, social_media_url: str, website_url: str):
-        self.botname = botname
+    def __init__(self, token: str, template: str, coupon_mask: str, social_media_url: str,
+                 website_url: str, promo_end_date: str | None = None, font: str | None = None):
+        """Экземпляр бота.
+
+        Имя бота (botname) определяется автоматически через get_me() в run(),
+        поэтому отдельный Bot + get_me() в main.py больше не нужен —
+        один экземпляр Bot на бота.
+
+        promo_end_date — дата окончания акции из конфига (ГГГГ-ММ-ДД).
+        Валидируется сразу при создании, чтобы опечатка в конфиге была
+        видна в логе с именем/токеном бота, а не приводила к тихому
+        закрытию выдачи купонов.
+        """
         self.token = token
+        self.botname = None
         self.template = template
         self.coupon_mask = coupon_mask
         self.social_media_url = social_media_url
         self.website_url = website_url
+        self.font = font
+        self.promo_end_date = None
+        self.set_promo_end_date(promo_end_date)
         self.dp = Dispatcher()
         self.init_done = False
+
+    def set_promo_end_date(self, value):
+        """Парсит и сохраняет дату окончания акции; при ошибке — выдача закрыта."""
+        if not value:
+            return
+        try:
+            self.promo_end_date = datetime.datetime.strptime(str(value), "%Y-%m-%d").date()
+        except ValueError:
+            logging.error(
+                f"Некорректная дата promo_end_date {value!r} у бота "
+                f"{mask_token(self.token)} (ожидается ГГГГ-ММ-ДД) — "
+                f"выдача купонов считается закрытой"
+            )
+            self.promo_end_date = None
+
+    @property
+    def promo_active(self) -> bool:
+        """Окно акции открыто, если дата задана и сегодня <= promo_end_date."""
+        if self.promo_end_date is None:
+            return False
+        return datetime.date.today() <= self.promo_end_date
 
     async def setup_router(self):
         if not self.init_done:
@@ -32,9 +70,17 @@ class BotInstance:
 
     async def run(self):
         bot = Bot(self.token)
-        botInfo = await bot.get_me()
+        try:
+            botInfo = await bot.get_me()
+        except TelegramUnauthorizedError:
+            logging.error(f"Неверный токен {mask_token(self.token)} — бот не запущен")
+            print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - '
+                  f'Бот {mask_token(self.token)}: неверный токен, пропуск')
+            await bot.session.close()
+            return
+        self.botname = botInfo.first_name
         logging.info(f"Инициализация бота \"{botInfo.first_name}\", ID: {botInfo.id}")
-        print(f'{str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))} - Бот {botInfo.first_name} запущен')
+        print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - Бот {botInfo.first_name} запущен')
 
         await self.setup_router()
 
