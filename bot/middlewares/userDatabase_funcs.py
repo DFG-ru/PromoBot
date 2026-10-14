@@ -1,6 +1,7 @@
 from pathlib import Path
 import csv
 import io
+import logging
 
 import aiofiles
 
@@ -42,6 +43,7 @@ async def _write_rows(rows):
 async def write(user_id, first_name, last_name, username, phone_number=None, coupon_code=None):
     # csv.writer не работает с асинхронными файловыми объектами,
     # поэтому сериализуем строку в памяти и пишем через aiofiles.
+    logging.debug(f"DB write: user_id={user_id}, phone={phone_number} -> {user_db_path}")
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow([
@@ -57,7 +59,9 @@ async def write(user_id, first_name, last_name, username, phone_number=None, cou
 
 
 async def update(phone_number, new_data):
+    logging.debug(f"DB update: phone={phone_number}, fields={list(new_data)}")
     if not user_db_path.is_file():
+        logging.debug(f"DB update: файл базы не найден ({user_db_path}), пропуск")
         return False
 
     updated = False
@@ -91,12 +95,14 @@ async def update(phone_number, new_data):
     # 5️⃣ Сохраняем изменения
     if updated:
         await _write_rows(rows)
-
+    logging.debug(f"DB update: phone={phone_number} -> {'запись обновлена' if updated else 'запись не найдена'}")
     return updated
 
 
 async def update_coupon(phone_number, new_data):
+    logging.debug(f"DB update_coupon: phone={phone_number}, fields={list(new_data)}")
     if not user_db_path.is_file():
+        logging.debug(f"DB update_coupon: файл базы не найден ({user_db_path}), пропуск")
         return False
 
     updated = False
@@ -133,27 +139,32 @@ async def update_coupon(phone_number, new_data):
     # 5️⃣ Сохраняем изменения
     if updated:
         await _write_rows(rows)
-
+    logging.debug(f"DB update_coupon: phone={phone_number} -> "
+                  f"{'купон записан' if updated else 'запись с пустым купоном не найдена'}")
     return updated
 
 
 async def phone_exist(phone_number):
     if not user_db_path.is_file():
+        logging.debug(f"DB phone_exist: файл базы не найден ({user_db_path}) -> False")
         return False
     rows = await _read_rows()
 
     # Проходим по всем строкам
     for row in rows:
         if len(row) > COLUMNS['phone_number'] and row[4] == phone_number:
+            logging.debug(f"DB phone_exist: phone={phone_number} -> True")
             return True
 
     # Номер не найден
+    logging.debug(f"DB phone_exist: phone={phone_number} -> False (строк в базе: {len(rows)})")
     return False
 
 
 async def coupon_exist(user_id, coupon_mask):
     user_id = str(user_id)
     if not user_db_path.is_file():
+        logging.debug(f"DB coupon_exist: файл базы не найден ({user_db_path}) -> False")
         return False
     rows = await _read_rows()
 
@@ -161,20 +172,26 @@ async def coupon_exist(user_id, coupon_mask):
     for row in rows:
         if len(row) > COLUMNS['coupon_code'] and row[0] == user_id:
             if row[5][:7] == coupon_mask:
+                logging.debug(f"DB coupon_exist: user_id={user_id}, mask={coupon_mask!r} -> True")
                 return True
 
     # Купон не найден
+    logging.debug(f"DB coupon_exist: user_id={user_id}, mask={coupon_mask!r} -> False")
     return False
 
 
 async def get_user_coupon(phone_number, coupon_mask):
     if not user_db_path.is_file():
+        logging.debug(f"DB get_user_coupon: файл базы не найден ({user_db_path}) -> None")
         return None
     rows = await _read_rows()
     for row in rows:
         if len(row) > COLUMNS['coupon_code'] and row[4] == phone_number:
             if row[5] == "":
+                logging.debug(f"DB get_user_coupon: phone={phone_number} -> None (купон пуст)")
                 return None
             if row[5][:7] == coupon_mask:
+                logging.debug(f"DB get_user_coupon: phone={phone_number} -> {row[5]!r}")
                 return row[5]
+    logging.debug(f"DB get_user_coupon: phone={phone_number}, mask={coupon_mask!r} -> None (не найдено)")
     return None

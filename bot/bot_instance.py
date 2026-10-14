@@ -37,10 +37,12 @@ class BotInstance:
 
     def set_promo_end_date(self, value):
         """Парсит и сохраняет дату окончания акции; при ошибке — выдача закрыта."""
+        logging.debug(f"set_promo_end_date({value!r}) для бота {mask_token(self.token)}")
         if not value:
             return
         try:
             self.promo_end_date = datetime.datetime.strptime(str(value), "%Y-%m-%d").date()
+            logging.debug(f"Дата окончания акции установлена: {self.promo_end_date}")
         except ValueError:
             logging.error(
                 f"Некорректная дата promo_end_date {value!r} у бота "
@@ -69,9 +71,11 @@ class BotInstance:
         return await handler(event, data)
 
     async def run(self):
+        logging.debug(f"run(): инициализация бота {mask_token(self.token)}")
         bot = Bot(self.token)
         try:
             botInfo = await bot.get_me()
+            logging.debug(f"get_me() успешен: id={botInfo.id}, username=@{botInfo.username}")
         except TelegramUnauthorizedError:
             logging.error(f"Неверный токен {mask_token(self.token)} — бот не запущен")
             print(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} - '
