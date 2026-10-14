@@ -4,6 +4,7 @@ from aiogram.types import Message, Contact, FSInputFile, ReplyKeyboardRemove
 from middlewares import couponGen
 from middlewares import couponCodes_funcs as couponDB
 from middlewares import userDatabase_funcs as userDB
+from middlewares.couponGen import OUTPUT_DIR
 import logging
 import datetime
 
@@ -22,7 +23,7 @@ async def contact_handler(message: Message, bot_instance):
     logging.info(f"User logged in. | fullname={full_name}, username=@{username}, id={user_id}")
 
     # Проверка наличия номера телефона в базе данных пользователей
-    if userDB.phone_exist(contact.phone_number) and userDB.coupon_exist(user_id, bot_instance.coupon_mask):
+    if await userDB.phone_exist(contact.phone_number) and await userDB.coupon_exist(user_id, bot_instance.coupon_mask):
         logging.info(f"Existing user found, data updated. | fullname={full_name}, username=@{username}, id={user_id}")
         new_data = {
             'user_id': user_id,
@@ -30,22 +31,42 @@ async def contact_handler(message: Message, bot_instance):
             'last_name': user.last_name,
             'username': user.username
         }
-        userDB.update(contact.phone_number, new_data)
+        await userDB.update(contact.phone_number, new_data)
     else:
         logging.info(f"New user authorized. | fullname={full_name}, username=@{username}, id={user_id}")
-        userDB.write(user.id, user.first_name, user.last_name, user.username, contact.phone_number)
+        await userDB.write(user.id, user.first_name, user.last_name, user.username, contact.phone_number)
 
     # Получение купона для пользователя
-    coupon_code = userDB.get_user_coupon(contact.phone_number, bot_instance.coupon_mask)
+    coupon_code = await userDB.get_user_coupon(contact.phone_number, bot_instance.coupon_mask)
     
     
     
     if coupon_code == None and datetime.date.today() < datetime.date(2026, 1, 1):
-        coupon_code = couponDB.get_random_coupon_code(bot_instance.coupon_mask)
+        try:
+            coupon_code = await couponDB.get_random_coupon_code(bot_instance.coupon_mask)
+        except FileNotFoundError:
+            logging.error("Файл CouponCodes.txt не найден — выдача купонов невозможна")
+            await message.answer(
+                "Купоны временно недоступны. Попробуйте позже.",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+            return
+        except ValueError:
+            logging.warning("Свободные купоны закончились")
+            await message.answer(
+                "К сожалению, все купоны уже разыграны.\n"
+                "\n"
+                f"Следите за новыми предложениями в нашем телеграмм канале:\n"
+                f"\n"
+                f"https://t.me/samaragastro\n"
+                f"💎💎💎\n",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+            return
         new_data = {
             'coupon_code': coupon_code
         }
-        userDB.update_coupon(contact.phone_number, new_data)
+        await userDB.update_coupon(contact.phone_number, new_data)
         logging.info(f"User received a new coupon. | fullname={full_name}, username=@{username}, id={user_id}, coupon=\"{coupon_code}\"")
     elif coupon_code == None and datetime.date.today() > datetime.date(2026, 1, 1):
         await message.answer(
@@ -59,15 +80,21 @@ async def contact_handler(message: Message, bot_instance):
         )
         return
     
-    qr_file_name = f"middlewares/output/{coupon_code[-6:]}.jpg"
+    qr_file_name = OUTPUT_DIR / f"{coupon_code[-6:]}.jpg"
 
     # Генерация QR-кода, если файл не существует
     if not os.path.exists(qr_file_name):
         logging.info(f"Generating QR code for coupon: {coupon_code}")
-        couponGen(bot_instance.template, str(coupon_code))
-    
+        if not await couponGen(bot_instance.template, str(coupon_code)):
+            logging.error(f"Не удалось сгенерировать купон: {coupon_code}")
+            await message.answer(
+                "Не удалось сформировать ваш купон. Попробуйте позже.",
+                reply_markup=types.ReplyKeyboardRemove()
+            )
+            return
+
     # Отправка купона пользователю
-    qr_file = FSInputFile(qr_file_name)
+    qr_file = FSInputFile(str(qr_file_name))
     logging.info(f"User received coupon. | fullname={full_name}, username=@{username}, id={user_id}, coupon=\"{coupon_code}\"")
     await message.answer(
         "Ваш купон:",
