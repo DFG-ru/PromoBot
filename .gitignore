@@ -25,6 +25,7 @@
 !bot/bot_runner.py
 !bot/settings.py
 !bot/paths.py
+!bot/mtproto.py
 !bot/__init__.py
 !bot/main.py
 !bot/log/.gitkeep
