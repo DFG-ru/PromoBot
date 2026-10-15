@@ -25,11 +25,16 @@
 !bot/bot_runner.py
 !bot/settings.py
 !bot/paths.py
+!bot/mtproto.py
 !bot/__init__.py
 !bot/main.py
 !bot/log/.gitkeep
 !bot/data/CouponCodes.txt.example
 !bot/data/bots_config.json.example
+!bot/data/mtproto_config.json.example
+# Секреты и сессии MTProto — никогда не коммитим:
+bot/data/mtproto_config.json
+bot/data/*.session
 !bot/handlers/__init__.py
 !bot/handlers/contact_handler.py
 !bot/handlers/keyboards.py
